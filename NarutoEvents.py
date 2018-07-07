@@ -26,7 +26,9 @@ async def command_schedulehere(ctx: commands.Context):
 async def command_schedule(ctx: commands.Context):
     try:
         if channel is not None:
-            schedule_message(channel, *(str.split(ctx.message.content)[1::]))
+            schedule = ctx.message.content.replace(bot.command_prefix + "schedule ", "")
+            schedule_message(channel, *split_schedule(schedule))
+            write_schedule_to_file(schedule)
             send_message(ctx.message.channel, "Message scheduled! :)")
         else:
             send_message(ctx.message.channel, str.format("Set a channel with {}schedulehere.", bot.command_prefix))
@@ -48,30 +50,40 @@ async def command_schedules(ctx: commands.Context):
 @bot.command(name="unschedule", pass_context=True, no_pm=True)
 async def command_unschedule(ctx: commands.Context):
     try:
-        remove_schedule_from_file(int(str.split(ctx.message.content)[1]))
+        remove_schedule_from_file(int(ctx.message.content.split()[1]))
         send_message(ctx.message.channel, "Unscheduled.")
     except Exception as e:
         send_message(ctx.message.channel, bot.command_prefix + "unschedule <index>")
         print(str(e))
+        
+        
+def split_schedule(schedule: str) -> list:
+    if '"' not in schedule:
+        return schedule.split()
+    
+    message = schedule[schedule.find('"') + 1 : schedule.rfind('"'):]
+    day, time = schedule[schedule.rfind('"') + 2 ::].split()
+    return [message, day, time]
 
 
-def get_schedules_from_file():
+def get_schedules_from_file() -> str:
     with open(SCHEDULES_FILENAME, 'r') as f:
         result = ""
         counter = 0
 
         for line in f.readlines():
             counter += 1
-            params = str.split(line)
-            print(params)
-            result += str.format("{}. Say \"{}\" every {} at {}.\n", counter, params[0], str.capitalize(params[1]), params[2])
+            schedule_list = split_schedule(line)
+            result += str.format("{}. Say \"{}\" every {} at {}.\n", counter, schedule_list[0], str.capitalize(schedule_list[1]), schedule_list[2])
 
         return result if len(result) != 0 else None
 
 
-def write_schedule_to_file(message: str, day: str, time: str):
+def write_schedule_to_file(schedule: str):
     with open(SCHEDULES_FILENAME, 'a') as f:
-        f.write(str.format("{} {} {}\n", message, day, time))
+        if schedule[-1] != '\n':
+            schedule += '\n'
+        f.write(schedule)
 
 
 def remove_schedule_from_file(index: int):
@@ -95,7 +107,6 @@ def schedule_message(channel: discord.Channel, message: str, day: str, time: str
         raise Exception()
 
     getattr(schedule.every(), day).at(time).do(send_message, channel, message)
-    write_schedule_to_file(message, day, time)
 
 
 async def run_schedules():
