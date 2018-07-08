@@ -9,6 +9,7 @@ bot = commands.Bot(command_prefix="^")
 
 SCHEDULES_FILENAME = "schedules.txt"
 TOKEN = "NDUwMzE5NzY3NDI1OTA4NzM2.DiGEsA.K8QvYIzrns-E6L_FjhynHfOXiDA"
+MESSAGE_CHARACTER_LIMIT = 2000
 
 
 @bot.event
@@ -27,23 +28,29 @@ async def command_schedulehere(ctx: commands.Context):
 @bot.command(name="schedule", pass_context=True, no_pm=True)
 async def command_schedule(ctx: commands.Context):
     try:
-        if channel is not None:
-            schedule = ctx.message.content.replace(bot.command_prefix + "schedule ", "")
-            schedule_message(channel, *split_schedule(schedule))
-            write_schedule_to_file(schedule)
-            send_message(ctx.message.channel, "Message scheduled! :)")
-        else:
+        if channel is not None:                                              
+            schedule_str = ctx.message.content.replace(bot.command_prefix + "schedule ", "")
+            schedule_message(channel, *split_schedule(schedule_str))         
+            write_schedule_to_file(schedule_str)                             
+            send_message(ctx.message.channel, "Message scheduled! :)")       
+        else:                                                                
             send_message(ctx.message.channel, str.format("Set a channel with {}schedulehere.", bot.command_prefix))
-    except Exception as e:
+    except Exception as e:                                                   
         send_message(ctx.message.channel, bot.command_prefix + "schedule <message> <day> <time HH:MM>")
-        print(str(e))
-
+        print(str(e))                                                        
+                                                                             
 
 @bot.command(name="schedules", pass_context=True, no_pm=True)
 async def command_schedules(ctx: commands.Context):
     try:
         schedules = get_schedules_from_file()
-        send_message(ctx.message.channel, schedules if schedules is not None else "There are no schedules ;).")
+        schedules_str = ""
+        if len(schedules) == 0:
+            send_message(ctx.message.channel, "There are no schedules ;).")
+            return
+            
+        for m in split_schedules_into_messages(schedules):
+            send_message(ctx.message.channel, m)
     except Exception as e:
         send_message(ctx.message.channel, "Error.")
         print(str(e))
@@ -76,11 +83,22 @@ def find_mentions(s: str) -> list:
             mentions.append(p)
     
     return mentions
+    
+    
+def split_schedules_into_messages(schedules: list) -> list:
+    messages = [""]
+    for schedule in schedules:
+        if len(messages[len(messages)-1]) + len(schedule) >= MESSAGE_CHARACTER_LIMIT:
+            messages.append(schedule)
+        else:
+            messages[len(messages) - 1] += schedule
+                
+    return messages
 
 
-def get_schedules_from_file() -> str:
+def get_schedules_from_file() -> list:
     with open(SCHEDULES_FILENAME, 'r') as f:
-        result = ""
+        schedules = list()
         counter = 0
 
         for line in f.readlines():
@@ -89,9 +107,9 @@ def get_schedules_from_file() -> str:
             for m in find_mentions(schedule_list[0]):
                 schedule_list[0] = schedule_list[0].replace(m, "`" + m + "`")
             
-            result += str.format("{}. Say \"{}\" every {} at {}.\n", counter, schedule_list[0], str.capitalize(schedule_list[1]), schedule_list[2])
+            schedules.append(str.format("{}. Say \"{}\" every {} at {}.\n", counter, schedule_list[0], str.capitalize(schedule_list[1]), schedule_list[2]))
 
-        return result if len(result) != 0 else None
+        return schedules
 
 
 def write_schedule_to_file(schedule: str):
