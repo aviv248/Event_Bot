@@ -2,11 +2,13 @@ import discord
 from discord.ext import commands
 import asyncio
 import schedule
+import re
 
 client = discord.Client()
 bot = commands.Bot(command_prefix="^")
 
 SCHEDULES_FILENAME = "schedules.txt"
+TOKEN = "NDUwMzE5NzY3NDI1OTA4NzM2.DiGEsA.K8QvYIzrns-E6L_FjhynHfOXiDA"
 
 
 @bot.event
@@ -64,6 +66,16 @@ def split_schedule(schedule: str) -> list:
     message = schedule[schedule.find('"') + 1 : schedule.rfind('"'):]
     day, time = schedule[schedule.rfind('"') + 2 ::].split()
     return [message, day, time]
+    
+    
+def find_mentions(s: str) -> list:
+    mentions = list()
+    possibilites = ['@everyone', '@here']
+    for p in possibilites:
+        if p in s:
+            mentions.append(p)
+    
+    return mentions
 
 
 def get_schedules_from_file() -> str:
@@ -74,6 +86,9 @@ def get_schedules_from_file() -> str:
         for line in f.readlines():
             counter += 1
             schedule_list = split_schedule(line)
+            for m in find_mentions(schedule_list[0]):
+                schedule_list[0] = schedule_list[0].replace(m, "`" + m + "`")
+            
             result += str.format("{}. Say \"{}\" every {} at {}.\n", counter, schedule_list[0], str.capitalize(schedule_list[1]), schedule_list[2])
 
         return result if len(result) != 0 else None
@@ -117,5 +132,5 @@ async def run_schedules():
 
 channel = None
 bot.loop.create_task(run_schedules())
-bot.run("NDUwMzE5NzY3NDI1OTA4NzM2.DiGEsA.K8QvYIzrns-E6L_FjhynHfOXiDA")
+bot.run(TOKEN)
 
